@@ -1,0 +1,932 @@
+---
+title: "Carbon Emission Trends and Industry Impact"
+author: "Jason A. Dayuha"
+date: "2024-07-25"
+output: 
+  html_document:
+    toc: yes
+    theme: united
+  word_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE)
+```
+
+
+
+# 1. Introduction
+
+This analysis is part of the weekly data analysis program from Tidy Tuesday. It consists of a community of individuals that have a passion for data analysis. Every week a data project consisting of a wide range of topics is analyzed by the community which is then shared to further improve data analysis skills and insight of the subject focused at that week. This report focuses on the week of 05-21-2024, specifically examining carbon major emissions production worldwide. The project explores the amount of emissions produced by the largest energy companies globally.
+
+# 2. Guided Questions
+
+Project Task: Data analysis will answer the following question:
+
+&nbsp;&nbsp;&nbsp;&nbsp;1.	How have the total emissions (in MtCO2e) changed over the years?
+
+&nbsp;&nbsp;&nbsp;&nbsp;2.	Which parent entities contribute the most to total emissions?
+
+&nbsp;&nbsp;&nbsp;&nbsp;3.	Which commodity has the highest average emissions per year?
+
+&nbsp;&nbsp;&nbsp;&nbsp;4.	Is there a correlation between production values and total emissions for each commodity?
+
+&nbsp;&nbsp;&nbsp;&nbsp;5.	How does the emissions intensity (emissions per unit of production) vary among different parent entities?
+
+&nbsp;&nbsp;&nbsp;&nbsp;6.	Which parent entity has shown the highest growth in production over the years?
+
+&nbsp;&nbsp;&nbsp;&nbsp;7.	Which year had the highest total emissions?
+
+
+# 3. Data Preperation
+
+The raw data consists of 1 Excel file, which is saved to a private, secure computer for analysis. This data consists of information from 1962 to 2022. The data consists of the following information:
+
+&nbsp;&nbsp;&nbsp;&nbsp;•	Year- time data was collected
+
+&nbsp;&nbsp;&nbsp;&nbsp;•	parent_entity – business name that produced the emission
+
+&nbsp;&nbsp;&nbsp;&nbsp;•	parent_type – state owned or investor owned company 
+
+&nbsp;&nbsp;&nbsp;&nbsp;•	commodity – type of natural resources that the emissions came from
+
+&nbsp;&nbsp;&nbsp;&nbsp;•	production_value –  the emission amount produced 
+
+&nbsp;&nbsp;&nbsp;&nbsp;•	production_unit – million bbl/yr million barrels per year; bcf/yr billion cubic feet per year used to measure the production of natural gas
+
+&nbsp;&nbsp;&nbsp;&nbsp;•	total_emissions_MtCO2e- 
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;total Emissions: This represents the sum of all greenhouse gases emitted, converted into a common unit for comparison.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MtCO2e: This stands for "metric tons of carbon dioxide equivalent." It quantifies emissions of various greenhouse gases, such as methane (CH4) and nitrous oxide (N2O), in terms of the amount of CO2 that would have the same global warming potential.
+
+
+# 4. Process and Clean data
+
+
+4.1 Download the Libraries used to work with this data.
+
+```{r library, warning=FALSE,include=FALSE}
+
+# install.packages("tidytuesdayR")
+# install.packages("tidyverse")
+# install.packages("dplyr")
+# install.packages("janitor")
+# install.packages("skimr")
+# install.packages("lubridate")
+# install.packages("ggpubr")
+# install.packages("data.table")
+# install.packages("viridis")
+# install.packages("leaflet")
+# install.packages("htmlwidgets")
+# install.packages("htmltools")
+# install.packages("kableExtra")
+# install.packages("here")
+# install.packages("visdat")
+# install.packages("readxl")
+# install.packages("tidyr")
+# install.packages("scales")
+# install.packages("plotly")
+# install.packages("forecast")
+# install.packages("gridExtra")
+# install.packages("formattable")
+
+
+# 4.1 Library used installations:
+
+library ("tidytuesdayR")
+library("tidyverse")
+library("dplyr")
+library("janitor")
+library("skimr")
+library("lubridate")
+library("ggpubr")
+library("data.table")
+library("viridis")
+library("leaflet")
+library("htmlwidgets")
+library("htmltools")
+library("kableExtra")
+library("here")
+library( "visdat")
+library( "readxl")
+library("tidyr")
+library("lubridate")
+library("scales")
+library("plotly")
+library("forecast")
+library("gridExtra")
+library("formattable")
+
+```
+
+
+4.2 Download the raw data 
+```{R Download_data, include= FALSE}
+
+
+#4.2 download Raw data
+
+file_path <- here("emissions_medium_granularity.csv")
+
+# Read the csv file into a data frame
+emissions_data <- read.csv(file_path)
+
+# produce an overview of the data
+str(emissions_data)
+
+skim_without_charts(emissions_data)
+
+glimpse(emissions_data)
+
+```
+
+
+4.3 Identify column names
+```{r Column names, eval=TRUE, message=FALSE,  echo=FALSE, results='asis'}
+#4.3 Identify Column names
+
+column_names <- names(emissions_data)
+
+# Determine optimal number of columns based on total column names, ensuring more than one column if possible
+total_columns <- length(column_names)
+num_columns <- ifelse(total_columns > 1, min(3, total_columns), 1)  # Adjust '3' to set max columns
+
+# Calculate number of rows, distributing names as evenly as possible across columns
+rows_needed <- ceiling(total_columns / num_columns)
+
+# Create a matrix with the appropriate structure, filling with column names
+column_matrix <- matrix("", nrow = rows_needed, ncol = num_columns)  # Initialize with empty strings
+column_matrix[1:total_columns] <- column_names
+
+# Convert to data frame for kable
+column_names_df <- as.data.frame(column_matrix, stringsAsFactors = FALSE)
+
+# Adjusting the names of the data frame to exclude "Column 1", "Column 2", etc. headers
+names(column_names_df) <- rep("", ncol(column_names_df))
+
+#Use kable and kableExtra to generate and style the table without "Column 1", "Column 2", etc. as headers
+kable(column_names_df, caption = "List of Column Names in Emissions Data", format = "html", col.names = NA) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+# # Use kable to generate the table with no column headers
+# kable_output <- kable(column_names_df, caption = "List of Column Names in the emissions_data Data Frame", format = "html", col.names = NA)
+
+#clean code:
+# Cleanup unnecessary variables
+rm(column_names, total_columns, num_columns, rows_needed, column_matrix, column_names_df)
+
+```
+
+4.4 Check to make sure all numbers are formatted correctly
+```{r number_format_check, eval=TRUE, include= FALSE}
+# 4.4 the following checks all columns if numeric:
+sapply(emissions_data ,is.numeric)
+
+```
+
+4.5  Identify outliers in the raw data
+```{r outliers, eval=TRUE, include= FALSE}
+
+#4.5  Identify outliers in the raw data.
+
+# Identify numeric columns, optionally excluding specific columns like 'year' and 'quarter'
+numeric_columns <- sapply(emissions_data, is.numeric)
+numeric_column_names <- names(numeric_columns[numeric_columns])
+
+# Function to calculate and return indices of outliers for a given numeric column
+find_outliers <- function(column) {
+  Q1 <- quantile(column, 0.25, na.rm = TRUE)
+  Q3 <- quantile(column, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  return(which(column < lower_bound | column > upper_bound))
+}
+
+# Apply the outlier detection function to each numeric column and store results
+outliers_list <- lapply(emissions_data[numeric_column_names], find_outliers)
+
+# Print the number of outliers found in each numeric column, and print the outlier values explicitly
+sapply(names(outliers_list), function(column_name) {
+  num_outliers <- length(outliers_list[[column_name]])
+  cat(column_name, ": Number of outliers =", num_outliers, "\n")
+  if (num_outliers > 0) {
+    # Retrieve and print the actual outlier values using the indices
+    outlier_values <- emissions_data[outliers_list[[column_name]], column_name, drop = FALSE]
+    cat("Outlier values in", column_name, ":", toString(outlier_values[[1]]), "\n\n")
+  }
+})
+
+
+```
+
+4.6 Check the unique values of each text-based column
+
+```{r Unquie_vlalues,eval=TRUE, echo=FALSE}
+#4.6 check columns to see the number of unique values.
+
+# Initialize an empty data frame to store results
+unique_values_df <- data.frame(Column_Name = character(), Number_of_Unique_Values = integer(), stringsAsFactors = FALSE)
+
+# Iterate through each string column in the emissions_data dataset
+for (column_name in names(emissions_data)) {
+  # Check if the column is of type character
+  if (is.character(emissions_data[[column_name]])) {
+    # Calculate the number of unique values
+    num_unique_values <- length(unique(emissions_data[[column_name]]))
+    # Append to the results data frame
+    unique_values_df <- rbind(unique_values_df, data.frame(Column_Name = column_name, Number_of_Unique_Values = num_unique_values))
+  }
+}
+
+# check what each unique value is on each column:
+
+# Determine the maximum number of unique values in any character column
+max_length <- max(sapply(emissions_data, function(col) if (is.character(col)) length(unique(col)) else 0))
+
+    # Create a list and add the counter column first
+list_of_unique_vals <- list(Counter = 1:max_length)
+
+# Iterate through each column to get unique values
+for (column_name in names(emissions_data)) {
+  if (is.character(emissions_data[[column_name]])) {
+    # Get unique values and adjust the length by adding NAs if necessary
+    unique_vals <- unique(emissions_data[[column_name]])
+    lengthened_vals <- c(unique_vals, rep(NA, max_length - length(unique_vals)))
+    list_of_unique_vals[[column_name]] <- lengthened_vals
+  }
+}
+
+# table
+kable(unique_values_df, "html") %>%
+  kableExtra::kable_classic(full_width = F) %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  column_spec(1, width = "3cm") %>%
+  column_spec(2, width = "3cm")
+# Standardize values if necessary:
+
+
+#Results: no unusual unique values
+#cleaning
+rm( max_length, list_of_unique_vals)
+```
+
+4.7 Identify missing or NA entry-  visualization
+
+```{r missing, eval=TRUE, echo= FALSE, fig.width=5, fig.height=5}
+# 4.7 Analyze patterns of missingness:
+ 
+vis_miss(emissions_data)
+
+# Visualize missing data patterns
+missing_percents <- sapply(emissions_data, function(x) mean(is.na(x))) * 100
+
+# Create a data frame for display
+missing_df <- data.frame(Column = names(missing_percents),
+                         MissingPercentage = round(missing_percents, 2))
+
+# Display as a simple table using kable
+kable(missing_df, caption = "Percentage of Missing Values by Column") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+
+
+# results show prcp, Tmax, Min have a lot of missing data, above 90%. Data points form 600, looks like location info is present.
+
+## Percentage of Non zero values for each column
+# Initialize a data frame to store the counts and percentages
+counts_df <- data.frame(Column_Name = character(),
+                        Number_of_Zero_Values = integer(),
+                        Number_of_NA_Values = integer(),
+                        Percentage_NonZero_NonNA = numeric(),
+                        stringsAsFactors = FALSE)
+
+# Iterate through each column in the emissions_data data frame
+for (column_name in names(emissions_data)) {
+  total_cells <- nrow(emissions_data)  # Total number of cells in the column
+  zero_count <- NA  # Default to NA for non-numeric columns
+  na_count <- sum(is.na(emissions_data[[column_name]]))  # Count NA values for all columns
+
+  # Check if the column is numeric for zero value counting
+  if (is.numeric(emissions_data[[column_name]])) {
+    zero_count <- sum(emissions_data[[column_name]] == 0, na.rm = TRUE)
+    non_zero_non_na <- sum(!is.na(emissions_data[[column_name]]) & emissions_data[[column_name]] != 0)  # Count non-zero, non-NA
+  } else {
+    non_zero_non_na <- sum(!is.na(emissions_data[[column_name]]))  # For non-numeric, just count non-NA
+  }
+
+  # Calculate the percentage of non-zero, non-NA values
+  percentage_non_zero_non_na <- (non_zero_non_na / total_cells) * 100
+
+  # Record the counts and percentage in the counts_df data frame
+  counts_df <- rbind(counts_df, data.frame(Column_Name = column_name,
+                                           Number_of_Zero_Values = zero_count,
+                                           Number_of_NA_Values = na_count,
+                                           Percentage_NonZero_NonNA = percentage_non_zero_non_na))
+}
+
+# identfy percent of completeness based on 1 column= Organization record data:
+
+
+
+# Calculate the percentage of non-NA values for each column grouped by parent_entry,
+# round to two decimal places, and add a column for overall row completeness also rounded to two decimal places
+data_overview <- emissions_data %>%
+  group_by(parent_type) %>%
+  summarise(across(everything(), ~round(mean(!is.na(.)) * 100, 2))) %>%
+  mutate(RowCompleteness = round(rowMeans(select(., -parent_type), na.rm = TRUE), 2)) %>%
+  ungroup()
+
+#------
+# Select the top 10 agency_name entries with the highest RowCompleteness
+top_completeness <- data_overview %>%
+  select(parent_type, RowCompleteness) %>%
+  arrange(desc(RowCompleteness)) %>%
+  top_n(18, RowCompleteness)
+
+# Display as a table using kable
+kable(top_completeness, caption = "Parent_type by Completeness", format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+#cleaning
+rm(missing_percents, missing_df, counts_df, data_overview)
+```
+
+4.8 Find and clean  zero values if necessary :
+
+```{r zero, eval=TRUE, echo=FALSE}
+# 4.8 Find and clean  zero values if necessary :
+
+#Initialize a data frame to store the counts of zero values
+zero_counts_df <- data.frame(Column_Name = character(), Number_of_Zero_Values = integer(), stringsAsFactors = FALSE)
+
+# Iterate through each column in the emissions_data data frame
+for (column_name in names(emissions_data)) {
+  # Check if the column is numeric
+  if (is.numeric(emissions_data[[column_name]])) {
+    # Count the number of zero values
+    zero_count <- sum(emissions_data[[column_name]] == 0, na.rm = TRUE)
+
+    # Record the count of zero values in the zero_counts_df data frame
+    zero_counts_df <- rbind(zero_counts_df, data.frame(Column_Name = column_name, Number_of_Zero_Values = zero_count))
+  }
+}
+
+kable(zero_counts_df, "html") %>%
+  kableExtra::kable_classic(full_width = F) %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  column_spec(1, width = "3cm") %>%
+  column_spec(2, width = "3cm")
+
+
+```
+
+
+4.9 Check for leading and trailing white spaces
+```{r white_spaces, eval=TRUE, include= FALSE, echo=FALSE}
+#4.9 check for leading and trailing white spaces:
+
+# check if there is any trailing spaces in any of the column in the df
+
+      # Assign the name of your actual dataframe to the variable df
+      df <- emissions_data
+
+       # Initialize a vector to store the sum of flagged cells for each column
+      whitespace_counts <- integer(length = ncol(df))
+
+      # Loop through each column in the dataframe
+      for (i in seq_along(df)) {
+        # Check if the column is of type character
+        if (is.character(df[[i]])) {
+          # Flag cells with leading or trailing whitespace
+          flagged_cells <- grepl("^\\s+|\\s+$", df[[i]])
+          # Sum the flagged cells and store the result
+          whitespace_counts[i] <- sum(flagged_cells)
+
+          # Optionally, you can also print out the results for each column
+          cat("Column:", names(df)[i], "has", whitespace_counts[i], "cells with whitespace\n")
+        }
+      }
+
+      # Create a named vector with the counts of whitespace per column
+      whitespace_summary <- setNames(whitespace_counts[whitespace_counts != 0], names(df)[whitespace_counts != 0])
+
+      # Print the summary
+      print(whitespace_summary)
+
+  
+
+```
+
+4.10 Check and delete duplicate rows
+```{r dupliate, eval=TRUE, include= FALSE}
+#4.10 Check and delete duplicate rows:
+# Check for duplicate rows
+duplicated_rows <- duplicated(emissions_data)
+print(duplicated_rows)
+
+#results show none.
+# if you want the total sum:
+#sum(duplicated_rows)
+# if you want to show to show what is duplicate rows: emissions_data[duplicated_rows, ]
+
+```
+
+
+4.11 Clean up column names for proper formatting 
+```{r clean_column, eval=TRUE, include= FALSE}
+
+# 4.11 covert all column names text with proper formatting
+clean_emission_df<-clean_names(emissions_data)
+
+```
+
+4.12 Check to make sure all numbers are formatted correctly.
+
+```{r number_format_check1, eval=TRUE,include= FALSE}
+# 4.12 the following checks all columns if numeric:
+sapply(clean_emission_df ,is.numeric)
+
+# Order by date 
+
+clean_emission_df <- clean_emission_df %>%
+  arrange(year)
+```
+
+
+4.13 Delete any rows with NA and other undesirables.
+```{r NA_test_deletetion, eval=TRUE,include=FALSE}
+
+# 4.13 Delete any rows with NA 
+clean_emission_df <- na.omit(clean_emission_df)
+
+```
+
+
+# 5. Analysis
+
+### 5.1  Total Emission per year
+
+```{r total_emissions, eval=TRUE, include=TRUE,echo=FALSE }
+ #5.1 Total Emission
+
+total_emission <- clean_emission_df %>%
+  select(year,total_emissions_mt_co2e) %>%
+  group_by(year) %>%
+  summarise(total_emission=sum(total_emissions_mt_co2e, na.rm=TRUE)) %>%
+  arrange(desc(year))
+
+
+total_emission$total_emission <- round(total_emission$total_emission, 2)
+
+#total_emission$total_emission <- format(total_emission$total_emission, scientific = FALSE)
+
+
+ggplot(data= total_emission, aes (x=year, y=total_emission))+
+  geom_line(color = "blue", size=1)+
+  geom_point(color = "red",size =2)+
+  labs(title= "Total Emissions by Year",
+       x= "Year",
+       y= "Total Emissions (MtCO2e)")+
+  theme_minimal()+
+  scale_y_continuous(labels = scales::comma)
+```
+
+
+Looking at the plot above total emissions increase steadily from the start of the data collection in 1854 up to the 1940s. Starting in the 1940s total emissions increased drastically until the present day. There is a slight dip in the 1980s and 1990s but overall total emissions production continues to rise year after year. 
+
+###  5.2 Parent Entites and Total Emissions
+```{r Entities_vs_Emissions, eval=TRUE, include=TRUE ,echo=FALSE, fig.width=10, fig.height=8}
+# #5.2 Heat Map
+
+# Create a data frame based on the emissions data
+heat_map_data <- clean_emission_df %>%
+  select(year, parent_entity, total_emissions_mt_co2e) %>%
+  group_by(year, parent_entity) %>%
+  summarise(total_emissions = sum(total_emissions_mt_co2e, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(parent_entity)
+
+# the parent entity for y is too big, to clean it up we split the plot 
+
+# Split the data frame into three parts based on parent_entity
+unique_parents <- unique(heat_map_data$parent_entity)
+n <- length(unique_parents)
+split_indices <- seq(1, n, length.out = 4)
+
+# Split data frames
+df_list <- list()
+for (i in 1:3) {
+  df_list[[i]] <- heat_map_data %>%
+    filter(parent_entity %in% unique_parents[split_indices[i]:(split_indices[i + 1] - 1)])
+}
+
+
+# Create a heatmap function to avoid repetition
+create_heatmap <- function(data, title_suffix, x_limits, x_breaks) {
+  ggplot(data, aes(x = year, y = fct_rev(parent_entity), fill = total_emissions)) +
+    geom_tile(color = "white") +
+    scale_fill_viridis_c(name = "Total Emissions (MtCO2e)") +
+    theme_light() +
+    labs(title = paste("Total Emissions by Parent Entity and Year", title_suffix),
+         y = "Parent Entity", x = "Year") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_continuous(limits = x_limits, breaks = x_breaks)
+}
+
+# Define x-axis limits and breaks
+x_limits <- range(heat_map_data$year, na.rm = TRUE)
+x_breaks <- seq(from = x_limits[1], to = x_limits[2], by = 5)
+
+# Generate and print heatmaps for each part
+for (i in 1:3) {
+  print(create_heatmap(df_list[[i]], paste("(Part", i, "of 3)"), x_limits, x_breaks))
+}
+
+# Assuming the data frame is already loaded as 'clean_emission_df'
+
+# Summarize total emissions by parent entity
+top_10_entities <- clean_emission_df %>%
+  group_by(parent_entity) %>%
+  summarise(total_emissions = sum(total_emissions_mt_co2e, na.rm = TRUE)) %>%
+  arrange(desc(total_emissions)) %>%
+  slice_head(n = 10)
+
+top_10_entities %>%
+  kable(
+    caption = "Top 10 Parent Entities by Total Emissions",
+    col.names = c("Parent Entity", "Total Emissions (MtCO2e)"),
+    format = "html"
+  ) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# Display the top 10 entities
+#print(top_10_entities)
+
+
+
+#clean enviornment:
+  rm(df_list,unique_parents,
+    # heatmap_plot,
+    #heatmap_plot_1,
+    # heatmap_plot_2,
+    # heatmap_plot_3,
+     i,n,split_indices,x_breaks,x_limits,create_heatmap)
+```
+
+The following table shows the top 10 entities that have produced the highest total emissions over the years. China’s coal production has produced the highest total emissions of 27458 (Metric Tons of Carbon Dioxide equivalent) MtCO2e spanning from 1945 to 2022. The next is Former Soviet Union producing total of 135,112 MtCO2e from 1900 to 1991. Compared to each of the top 2 entities individually (Former Soviet Union and Saudi Aramco), the rest of the entities collectively produced approximately 25% less total emissions over the years.
+Looking at the chart, most of the entities began operation around the early 1950s group. The next group of entities started  in the  early 1990s. the earliest companies started in the 1880s such as Exon Mobile and Westmoreland mining.
+
+### 5.3  Average Emissions per year
+```{r Emessions_per_year ,eval=TRUE, include=TRUE ,echo=FALSE}
+#5.3  Heat Map Average Emissions per YEar
+
+
+# Create a data frame based on the emissions data
+heat_map_data <- clean_emission_df %>%
+  select(year, commodity, total_emissions_mt_co2e) %>%
+  group_by(year, commodity) %>%
+  summarise(average_emissions = mean(total_emissions_mt_co2e, na.rm = TRUE), .groups = 'drop') %>%
+  arrange(commodity)
+
+# Calculate appropriate breaks within your data's range
+min_emissions <- min(heat_map_data$average_emissions, na.rm = TRUE)
+max_emissions <- max(heat_map_data$average_emissions, na.rm = TRUE)
+breaks <- seq(from = min_emissions, to = max_emissions, length.out = 10)
+
+# Create the heatmap plot
+heatmap_ave <- ggplot(heat_map_data, aes(x = year, y = commodity, fill = average_emissions)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(
+    name = "Average Emissions (MtCO2e)",
+    breaks = breaks,
+    labels = scales::comma(breaks)
+  ) +
+  theme_light() +
+  labs(title = "Average Emissions by Commodity and Year",
+       y = "Commodity",
+       x = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Print the heatmap plot
+print(heatmap_ave)
+
+# Clean the environment (optional, specify what to remove)
+ rm(max_emissions,min_emissions )  # Use with caution as it will remove all objects in the environmen
+
+
+```
+
+The commodities with the highest emissions are bituminous coal, lignite coal, and sub-bituminous coal. As shown in the bar graph above, emissions significantly increased around the 1950s, with bituminous coal averaging between 100 to 200 MtCO2e. This trend continued, peaking at 500 to 600 MtCO2e around 2021–2022. Anthracite coal and cement also saw notable increases starting around the 2000s, adding approximately 50 MtCO2e each year. Oil and NGL experienced a slight increase, averaging 200 MtCO2e around the 1980s. Before this period, oil and NGL hovered around an average of 50 MtCO2e annually.
+
+### 5.4 Emission vs Production Value for each Commodity
+```{r em_&prod_&comm,eval=TRUE, include=TRUE ,echo=FALSE, fig.width=10, fig.height=8}
+
+#5.4 Emission vs Production Value for each Commodity
+# Create a data frame based on the emissions data
+heat_map_data_PD <- clean_emission_df %>%
+  select(year, commodity, production_value, total_emissions_mt_co2e) %>%
+  group_by(year, commodity) %>%
+  summarise(
+    total_emissions = sum(total_emissions_mt_co2e, na.rm = TRUE),
+    average_PDV = mean(production_value, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  arrange(year)
+
+# Calculate appropriate breaks within your data's range
+min_emissions <- min(heat_map_data_PD$total_emissions, na.rm = TRUE)
+max_emissions <- max(heat_map_data_PD$total_emissions, na.rm = TRUE)
+breaks <- seq(from = min_emissions, to = max_emissions, length.out = 10)
+
+# Create the faceted scatter plot for each commodity
+scatter_plot_faceted <- ggplot(heat_map_data_PD, aes(x = year, y = average_PDV, size = total_emissions, color = total_emissions)) +
+  geom_point(alpha = 0.7) +
+  scale_color_viridis_c(
+    name = "Total Emissions (MtCO2e)",
+    breaks = breaks,
+    labels = scales::comma(breaks)
+  ) +
+  theme_light() +
+  labs(title = "Total Emissions by Production Value and Year",
+       y = "Average Production Value",
+       x = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(size = "none") +  # Hide the size legend
+  facet_wrap(~ commodity, scales = "free_y")  # Facet by commodity with independent y 
+
+
+# Create the faceted scatter plot for each commodity
+scatter_plot_faceted_1 <- ggplot(heat_map_data_PD, aes(x = year, y = average_PDV, size = total_emissions, color = total_emissions)) +
+  geom_point(alpha = 0.7) +
+  scale_color_viridis_c(
+    name = "Total Emissions (MtCO2e)",
+    breaks = breaks,
+    labels = scales::comma(breaks)
+  ) +
+  theme_light() +
+  labs(title = "Total Emissions by Production Value and Year",
+       y = "Average Production Value",
+       x = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(size = "none") +  # Hide the size legend
+  facet_wrap(~ commodity)  # Facet by commodity with independent y scales
+
+# Print the faceted scatter plot
+print(scatter_plot_faceted)
+print( scatter_plot_faceted_1)
+
+#rm(min_emissions,)
+```
+
+The scatter plot shows a relationship between production values and total emissions, especially after the 1900s. As average production values increase, total emissions rise as well. Commodities that demonstrate a strong relationship between production value and total emissions include anthracite coal, bituminous coal, metallurgical coal, and sub-bituminous coal. From 1900 to the present, there has been a positive linear increase between these two variables. Interestingly, for oil & NGL and thermal coal, there was a positive linear relationship between production value and total emissions from the 1900s to 1980 and 2000, respectively. After those specific years, there was a sharp decline, resulting in a negative linear relationship.
+
+Comparing the commodities, natural gas had the highest total emissions, reaching 11,039 MtCO2e in 2022. Oil & NGL appeared to peak in production value in 1980, but then dropped to 350 million bbl/yr in the 2000s, while total emissions continued to increase, as represented by the yellow circle. Cement production values have increased over the years, but its total emissions have remained steady at around 1,000 MtCO2e.
+
+
+### 5.5 Emission Intensity by Parent Company
+```{r Intensity,eval=TRUE, include=TRUE ,echo=FALSE, fig.width=10, fig.height=8}
+
+
+emission_int_df <- clean_emission_df %>%
+  select(year, commodity, parent_entity, total_emissions_mt_co2e, production_value, production_unit) %>%
+  group_by(year, parent_entity, production_unit, commodity) %>%  # Group by commodity as well
+  summarise(
+    total_emissions = sum(total_emissions_mt_co2e, na.rm = TRUE),
+    total_production_value = sum(production_value, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    emission_intensity = total_emissions / total_production_value,
+    parent_entity_label = paste0(parent_entity, "  (", commodity, ") (", "MtCO2e", "/", production_unit, ")")
+  ) %>%
+  arrange(parent_entity, year, production_unit)
+
+# Split the data frame into 5 parts based on parent_entity
+unique_parents <- unique(emission_int_df$parent_entity)
+n <- length(unique_parents)
+split_indices <- seq(1, n, length.out = 6)  # Adjust for 4 splits, creating 5 indices
+
+# Split data frames
+df_list <- list()
+for (i in 1:5) {
+  df_list[[i]] <- emission_int_df %>%
+    filter(parent_entity %in% unique_parents[split_indices[i]:(split_indices[i + 1] - 1)])
+}
+
+# Create a heatmap function to avoid repetition with custom y-axis font size
+create_heatmap <- function(data, title_suffix, x_limits1, x_breaks1) {
+  ggplot(data, aes(x = year, y = fct_rev(parent_entity_label), fill = emission_intensity)) +
+    geom_tile(color = "white") +
+    scale_fill_viridis_c(name = " Emissions Intensity ") +
+    theme_light() +
+    labs(title = paste("Emission Intensity by Parent Entity and Year", title_suffix),
+         y = "Parent Entity", x = "Year") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 8)) +  # Change font size for y-axis text
+    scale_x_continuous(limits = x_limits1, breaks = x_breaks1)
+}
+
+# Define x-axis limits and breaks
+x_limits1 <- range(emission_int_df$year, na.rm = TRUE)
+x_breaks1 <- seq(from = x_limits1[1], to = x_limits1[2], by = 5)
+
+# Generate and print heatmaps for each part
+for (i in 1:5) {  # Adjust to match 4 splits
+  print(create_heatmap(df_list[[i]], paste("(Part", i, "of 5)"), x_limits1, x_breaks1))
+}
+
+# Clean environment:
+rm(df_list, unique_parents, i, n, split_indices, x_breaks1, x_limits1, create_heatmap)
+
+
+```
+The heat map above shows Emission intensity varies drastically among the parent entities. One thing to note, however, is that for each commodity, the emission intensity for each parent entity does not change much over the years as indicated by the uniform color across the time the parent entity is in operation.
+
+
+### 5.5.1 Emission Intensity table
+```{r intensity_table ,eval=TRUE, include=TRUE ,echo=FALSE}
+# Calculate emission intensity and prepare the initial dataframe
+emission_int_df <- clean_emission_df %>%
+  mutate(emission_intensity = total_emissions_mt_co2e / production_value)
+
+# Aggregate data by parent entity
+aggregated_emission_df <- emission_int_df %>%
+  group_by(parent_entity) %>%
+  summarise(
+    avg_emission_intensity = mean(emission_intensity, na.rm = TRUE),
+    first_year = min(year, na.rm = TRUE),
+    last_year = max(year, na.rm = TRUE),
+    total_emissions = sum(total_emissions_mt_co2e, na.rm = TRUE),
+    total_production = sum(production_value, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Get top 10 parent entities by average emission intensity
+top_10_entities <- aggregated_emission_df %>%
+  arrange(desc(avg_emission_intensity)) %>%
+  slice_head(n = 10)
+
+# Create a formatted table
+top_10_entities %>%
+  mutate(
+    avg_emission_intensity = round(avg_emission_intensity, 3),
+    total_emissions = round(total_emissions, 3),
+    total_production = round(total_production, 3)
+  ) %>%
+  arrange(desc(avg_emission_intensity)) %>%
+  kable(
+    caption = "Top 10 Parent Entities by Average Emission Intensity",
+    col.names = c(
+      "Parent Entity",
+      "Avg Emission Intensity (MtCO2e per Production Unit)",
+      "First Year",
+      "Last Year",
+      "Total Emissions (MtCO2e)",
+      "Total Production (Production Unit)"
+    ),
+    format = "html"
+  ) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+
+### 5.5.2 Standard divation emission entensity
+```{r std_entensity ,eval=TRUE, include=TRUE ,echo=FALSE}
+# Calculate emission intensity and prepare the initial dataframe
+emission_int_df <- clean_emission_df %>%
+  mutate(emission_intensity = total_emissions_mt_co2e / production_value)
+
+emission_int_df <- clean_emission_df %>%
+  select(year, commodity, parent_entity, total_emissions_mt_co2e, production_value, production_unit) %>%
+  group_by(year, parent_entity, production_unit, commodity) %>%  # Group by commodity as well
+  summarise(
+    total_emissions = sum(total_emissions_mt_co2e, na.rm = TRUE),
+    total_production_value = sum(production_value, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    emission_intensity = total_emissions / total_production_value,
+    parent_entity_label = paste0(parent_entity, "  (", commodity, ") (", "MtCO2e", "/", production_unit, ")")
+  ) %>%
+  arrange(parent_entity, year, production_unit)
+
+# Create the parent entity label and aggregate data by parent entity
+aggregated_emission_df <- emission_int_df %>%
+  mutate(
+    parent_entity_label = paste0(parent_entity, "  (", commodity, ") (", "MtCO2e", "/", production_unit, ")")
+  ) %>%
+  group_by(parent_entity_label) %>%
+  summarise(
+    avg_emission_intensity = mean(emission_intensity, na.rm = TRUE),
+    first_year = min(year, na.rm = TRUE),
+    last_year = max(year, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Calculate the standard deviation of emission intensity for each parent entity label
+emission_intensity_variability <- emission_int_df %>%
+  group_by(parent_entity_label) %>%
+  summarise(
+    std_dev_emission_intensity = sd(emission_intensity, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Plot a density plot of the standard deviations of emission intensity
+plot(density(emission_intensity_variability$std_dev_emission_intensity, na.rm = TRUE),
+     main = "Density of Standard Deviations of Emission Intensity",
+     xlab = "Standard Deviation of Emission Intensity",
+     ylab = "Density",
+     col = "blue")
+
+
+```
+
+The table above show the top 10 parent entities statistically and their corresponding emission intensity. As you can see,  the emission intensities do not change vary much among the corresponding commodity. This is visually represented with the Standard Deviation of Emission Intensity of 0.00 shown above.
+
+### 5.6 Production Value for each Entity Specific 
+
+```{r prod_entity ,eval=TRUE, include=TRUE ,echo=FALSE, fig.width=10, fig.height=8}
+#5.6 Production Value for each Entity Specific 
+
+
+Production_df <- clean_emission_df %>%
+  select(year, commodity, parent_entity, production_value, production_unit) %>%
+  group_by(year, parent_entity, production_unit, commodity) %>%  # Group by commodity as well
+  summarise(
+    total_production_value = sum(production_value, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    parent_entity_label = paste0(parent_entity, "  (", commodity, ") (", production_unit, ")")
+  ) %>%
+  arrange(parent_entity, year, production_unit)
+
+# Split the data frame into 5 parts based on parent_entity
+unique_parents <- unique(Production_df$parent_entity)
+n <- length(unique_parents)
+split_indices <- seq(1, n, length.out = 6)  # Adjust for 4 splits, creating 5 indices
+
+# Split data frames
+df_list <- list()
+for (i in 1:5) {
+  df_list[[i]] <- Production_df %>%
+    filter(parent_entity %in% unique_parents[split_indices[i]:(split_indices[i + 1] - 1)])
+}
+
+# Create a heatmap function to avoid repetition with custom y-axis font size
+create_heatmap <- function(data, title_suffix, x_limits1, x_breaks1) {
+  ggplot(data, aes(x = year, y = fct_rev(parent_entity_label), fill = total_production_value)) +
+    geom_tile(color = "white") +
+    scale_fill_viridis_c(name = " Total Production Value ") +
+    theme_light() +
+    labs(title = paste("Production Value by Parent Entity and Year", title_suffix),
+         y = "Parent Entity", x = "Year") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 8)) +  # Change font size for y-axis text
+    scale_x_continuous(limits = x_limits1, breaks = x_breaks1)
+}
+
+# Define x-axis limits and breaks
+x_limits1 <- range(Production_df$year, na.rm = TRUE)
+x_breaks1 <- seq(from = x_limits1[1], to = x_limits1[2], by = 5)
+
+# Generate and print heatmaps for each part
+for (i in 1:5) {  # Adjust to match 4 splits
+  print(create_heatmap(df_list[[i]], paste("(Part", i, "of 5)"), x_limits1, x_breaks1))
+}
+
+# Clean environment:
+rm(df_list, unique_parents, i, n, split_indices, x_breaks1, x_limits1, create_heatmap)
+
+
+```
+
+Majority of the entities  production has been around or less then 1000 units over the years. There are notable companys that had high production values. The highest producing entities include the Former Soviet Union (Natural gas) that peaked around 1985 with around 30,000 BCCf/yr. The National Iranian Oil Co. with Natural Gas also increased its production from early 2000s,going from 5000 BCF/yr to around 8000 BCF/yr  in 2022.Saudi Araco  Oil & NGL and Natural Gas seem to have its highest production in the 1990s to late 2019s hovering around the 3000 to 4000 Bbl/yr and bcf/yr respectively. Shell (Natural Gas) gradually increased its production value from below the 1000 Bcf/yr in  1890 to 1969. It then rose to current levels around 3500 to 5000 Bcf/yr.
+
+
+# 6. Conclusion
+
+The data shows that over time, Total Emissions have substantially increased throughout the years. A significant rise began around the 1950s, with emissions skyrocketing in the early 1990s and continuing to rise to the present day. Several major entities have contributed high levels of emissions over the years, one of which was the former Soviet Union, which in the late 1980s produced 5,000 MtCO2e, making it the highest producer during that period. According to the most recent data from 2022, China (specifically from coal production) is currently the largest producer of emissions, with 12,000 MtCO2e.
+
+How could your team and business apply these insights?
+
+Based on the dataset, the highest recorded Total Emissions occurred in 2022, reaching 35,000 MtCO2e, which emphasizes the growing environmental challenge.
+
+What next steps should you or your stakeholders take based on these findings?
+
+The reduction of Total Emissions year after year is urgently needed. If the current trend continues, there will be severe consequences. Many argue that climate change is one of the direct results of continued air pollution being released each year. This could have a drastic impact on our overall health, both physically and mentally. We must become better stewards of the planet we live on.
+
+Is there additional data that could expand on these findings?
+
+Geographical data that identifies the specific sources of emissions worldwide could further enhance the analysis. Additionally, data on the consumption of key commodities for each country would be beneficial for a deeper understanding of the emission drivers.
+
+
+
+# 7. Appendix 
+
+```{r Appendix, ref.label = knitr::all_labels(), echo = TRUE, eval = FALSE}
+
+```
+
